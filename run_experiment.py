@@ -1,6 +1,7 @@
 import pandas
 import numpy as np
 import random
+import math
 
 def csv_data_to_matrix(event_data):
     event_data = event_data.reset_index()
@@ -103,6 +104,37 @@ def get_rank(scores):
     result[order] = np.arange(len(order))
     return result
 
+
+def sigmoid(logit):
+    return 1./(1+math.exp(-logit)) if logit > -10 else 1.
+
+
+def simulated_annealing(score_fn, modify_fn, initial_value):
+    value = initial_value
+    cur_score = score_fn(value)
+    best_value = initial_value
+    best_score = cur_score
+    n_iters = 300
+    for i in range(n_iters):
+        # linear temperature schedule
+        temp = n_iters/(n_iters-i)
+
+        new_value = modify_fn(value)
+        new_score = score_fn(new_value)
+
+        energy_gained = cur_score - new_score
+        acceptance_prob = sigmoid(energy_gained*temp)
+        accepted = random.random() < acceptance_prob
+        if new_score < best_score:
+            # print(new_score, cur_score, acceptance_prob, temp)
+            best_score = new_score
+            best_value = new_value
+        if accepted:
+            value = new_value
+            cur_score = new_score
+    return best_score, best_value
+
+
 def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None, allow_matchthrows=True):
     event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_df)
     assert len(player_ids) > 2
@@ -116,39 +148,23 @@ def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None,
     for i in range(num_tests):
         colluding_agents = [int(x) for x in np.random.choice(len(player_ids), size=n_colluding, replace=False)]
 
-        event_matrix_copy = event_matrix.copy()
+        def sim_score_fn(matrix):
+            all_scores = score_fn(matrix, game_count_matrix)
+            full_ranking = get_rank(all_scores)
+            min_rank_colluding = min(full_ranking[colluding_agents])
+            return min_rank_colluding
 
-        orig_scores = score_fn(event_matrix_copy, game_count_matrix)
+        def sim_modify_fn(src_matrix):
+            dest_matrix = src_matrix.copy()
+            modify_game_matrix(dest_matrix, event_matrix, colluding_agents, min_score, allow_matchthrows)
+            return dest_matrix
 
-        orig_ranking = get_rank(orig_scores)
-        orig_min_rank_colluding = min(orig_ranking[colluding_agents])
+        orig_score = sim_score_fn(event_matrix)
+        best_score, best_matrix = simulated_annealing(sim_score_fn, sim_modify_fn, event_matrix)
 
-        cur_min_rank_colluding = orig_min_rank_colluding
-        best_matrix = event_matrix_copy.copy()
-        best_ranking = orig_ranking.copy()
-        best_scores = orig_scores.copy()
-        for i in range(1000):
-            modify_game_matrix(event_matrix_copy, event_matrix, colluding_agents, min_score, allow_matchthrows)
-
-            scores = score_fn(event_matrix_copy, game_count_matrix)
-
-            ranking = get_rank(scores)
-
-            cur_rank_colluding = min(ranking[colluding_agents])
-            if cur_rank_colluding < cur_min_rank_colluding:
-                cur_min_rank_colluding = cur_rank_colluding
-                best_matrix = event_matrix_copy.copy()
-                best_ranking = ranking.copy()
-                best_scores = scores.copy()
-
-        total_rank_increase += orig_min_rank_colluding - cur_min_rank_colluding
-        if False and orig_min_rank_colluding >= cur_min_rank_colluding + 2:
+        total_rank_increase += orig_score - best_score
+        if False and orig_score >= orig_score + 2:
             print(colluding_agents)
-            print(orig_min_rank_colluding - cur_min_rank_colluding)
-            print(orig_ranking)
-            print(orig_scores)
-            print(best_ranking)
-            print(best_scores)
             print(best_matrix - event_matrix)
 
     print(total_rank_increase/num_tests)
