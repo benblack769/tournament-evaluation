@@ -108,6 +108,48 @@ def get_rank(scores):
 def sigmoid(logit):
     return 1./(1+math.exp(-logit)) if logit > -10 else 1.
 
+def competition_fn(score1, score2, value1, value2, temp):
+    energy_gained = score1 - score2
+    rejection_prob = sigmoid(energy_gained*temp)
+    rejected = random.random() < rejection_prob
+    return value1 if rejected else value2
+
+def genetic_algorithm(score_fn, mutate_fn, initial_value_fn, crossover_fn, initial_value):
+    pop = 10
+    n_crossovers = 5
+    n_mutates = 5
+    n_reinits = 3
+    n_initials = 2
+
+    n_iters = 100
+    population = [initial_value_fn() for i in range(pop)]
+    best_score = score_fn(initial_value)
+    best_result = initial_value
+    for i in range(n_iters):
+        population += [crossover_fn(random.choice(population),random.choice(population)) for i in range(n_crossovers)]
+        population += [mutate_fn(random.choice(population)) for i in range(n_mutates)]
+        population += [initial_value_fn() for i in range(n_reinits)]
+        population += [initial_value for i in range(n_initials)]
+
+        # find best agent in whole run of optimization
+        scores = [score_fn(agent) for agent in population]
+        cur_best_score = min(scores)
+        cur_best_result = population[np.argmin(scores)]
+
+        if cur_best_score < best_score:
+            best_score = cur_best_score
+            best_result = cur_best_result
+
+        # probablistically remove agents from population
+        temp = n_iters/(n_iters-i)
+        while len(population) > pop:
+            i1, i2 = np.random.choice(len(population), size=2, replace=False)
+            removed_i = competition_fn(scores[i1], scores[i2], i1, i2, temp)
+            del population[removed_i]
+
+    return best_score, best_result
+
+
 
 def simulated_annealing(score_fn, modify_fn, initial_value):
     value = initial_value
@@ -145,8 +187,22 @@ def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None,
 
     num_tests = 100
     total_rank_increase = 0
+    total_annealing_rank_increase = 0
     for i in range(num_tests):
         colluding_agents = [int(x) for x in np.random.choice(len(player_ids), size=n_colluding, replace=False)]
+
+        def initial_value():
+            matrix_copy = event_matrix.copy()
+            for i in range(100):
+                modify_game_matrix(matrix_copy, event_matrix, colluding_agents, min_score, allow_matchthrows)
+            return matrix_copy
+
+        def crossover(m1, m2):
+            m1f = m1.flatten()
+            m2f = m2.flatten()
+            assert len(m1f) == len(m2f)
+            mask = np.random.randint(0, 1, size=len(m1f))
+            return (m1f*mask + m2f*(1-mask)).reshape(m1.shape)
 
         def sim_score_fn(matrix):
             all_scores = score_fn(matrix, game_count_matrix)
@@ -154,20 +210,22 @@ def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None,
             min_rank_colluding = min(full_ranking[colluding_agents])
             return min_rank_colluding
 
-        def sim_modify_fn(src_matrix):
+        def mutate(src_matrix):
             dest_matrix = src_matrix.copy()
             modify_game_matrix(dest_matrix, event_matrix, colluding_agents, min_score, allow_matchthrows)
             return dest_matrix
 
         orig_score = sim_score_fn(event_matrix)
-        best_score, best_matrix = simulated_annealing(sim_score_fn, sim_modify_fn, event_matrix)
+        best_score, best_matrix = genetic_algorithm(sim_score_fn, mutate, initial_value, crossover, event_matrix)
+        best_score_ann, best_matrix_ann = simulated_annealing(sim_score_fn, mutate, event_matrix)
 
         total_rank_increase += orig_score - best_score
+        total_annealing_rank_increase += orig_score - best_score_ann
         if False and orig_score >= orig_score + 2:
             print(colluding_agents)
             print(best_matrix - event_matrix)
 
-    print(total_rank_increase/num_tests)
+    print(total_rank_increase/num_tests, total_annealing_rank_increase/num_tests)
 
 
 def run_experiment(df, score_fn):
