@@ -1,6 +1,6 @@
-from open_spiel.python.egt import alpharank
-from open_spiel.python.egt import alpharank_visualizer
+# from open_spiel.python.egt import alpharank_visualizer
 import pyspiel
+from open_spiel.python.egt import alpharank
 from open_spiel.python.egt import utils
 from open_spiel.python.egt import heuristic_payoff_table
 
@@ -9,8 +9,8 @@ game = pyspiel.load_matrix_game("matrix_rps")
 payoff_tables = utils.game_payoffs_array(game)
 
 # Convert to heuristic payoff tables
-payoff_tables= [heuristic_payoff_table.from_matrix_game(payoff_tables[0]),
-                heuristic_payoff_table.from_matrix_game(payoff_tables[1].T)]
+payoff_tables = [heuristic_payoff_table.from_matrix_game(payoff_tables[0]),
+                 heuristic_payoff_table.from_matrix_game(payoff_tables[1].T)]
 
 payoffs_are_hpt_format = utils.check_payoffs_are_hpt(payoff_tables)
 
