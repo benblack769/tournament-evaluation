@@ -68,6 +68,8 @@ def test_alpha_rank():
     # Convert to heuristic payoff tables
     payoff_tables = [heuristic_payoff_table.from_matrix_game(payoff_tables[0]),
                      heuristic_payoff_table.from_matrix_game(payoff_tables[1].T)]
+    print(payoff_tables[0]._payoffs)
+    print(payoff_tables[1]._payoffs)
 
     payoffs_are_hpt_format = utils.check_payoffs_are_hpt(payoff_tables)
 
@@ -77,13 +79,22 @@ def test_alpha_rank():
     # single-population dynamics.
     _, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
 
+    print(payoff_tables[0].num_players, payoff_tables[0].num_strategies, payoff_tables[0]._payoffs)
     (rhos, rho_m, pi, num_profiles, num_strats_per_population) = alpha_rank(payoff_tables, alpha=1e2)
 
     # Report results
-    alpharank.print_results(payoff_tables, payoffs_are_hpt_format, pi=pi)
+    # alpharank.print_results(payoff_tables, payoffs_are_hpt_format, pi=pi)
 
-    payoff_tables = alpharank_example.get_kuhn_poker_data(num_players=3)
-    alpharank.compute_and_report_alpharank(payoff_tables, alpha=1e2)
+    payoff_tables = alpharank_example.get_kuhn_poker_data(num_players=2)
+    is_symmetric, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
+    print(is_symmetric)
+    print(len(payoff_tables))
+    print(payoff_tables[0].shape, payoff_tables[0])
+    print(payoff_tables[1].shape, payoff_tables[1])
+    #print(payoff_tables[0].num_players, payoff_tables[0].num_strategies, payoff_tables[0]._payoffs)
+    #print(payoff_tables[1].num_players, payoff_tables[1].num_strategies, payoff_tables[1]._payoffs)
+    #print(payoff_tables[2].num_players, payoff_tables[2].num_strategies, payoff_tables[2]._payoffs)
+    # alpharank.compute_and_report_alpharank(payoff_tables, alpha=1e2)
 
 
 class MaxEntropyNash():
@@ -108,6 +119,17 @@ class MaxEntropyNash():
                         dual_variables[joint_action] = 0
             return dual_variables, joint
         self.dual_variables, self.joint = generate_dual(action_space)
+
+        self.payoff_map = {}
+        for i, row in enumerate(payoffs):
+            for j, pay in enumerate(row):
+                self.payoff_map[(action_space[i], action_space[j])] = pay
+
+        self.payoff_gains = {}
+        for i, action_a in enumerate(self.action_space):
+            for j, action_b in enumerate(self.action_space):
+                self.payoff_gains[(action_a, action_b)] = self.payoff_gain(action_a, action_b)
+
         self.log_grad_descent(self.dual_variables, self.joint, verbose=False, rounds=1000)
         probs = {}
         for action in action_space:
@@ -115,15 +137,15 @@ class MaxEntropyNash():
             print(action, ": ", self.P(self.dual_variables, action))
 
     def payoff(self, action_1, action_2):
-        return self.payoffs[self.action_to_index[action_1]][self.action_to_index[action_2]]
+        return self.payoff_map[(action_1, action_2)]
 
     def payoff_gain(self, alt_action, action, maximum=False, positive=True):
         # Calculate M(alt_action, action') & M(action, action')
         diff = 0
         for action_prime in self.action_space:
             if action_prime is not action:
-                payoffs_alt = self.payoff(alt_action, action_prime)
-                payoffs_act = self.payoff(action, action_prime)
+                payoffs_alt = self.payoff_map[(alt_action, action_prime)]
+                payoffs_act = self.payoff_map[(action, action_prime)]
                 if maximum:
                     if positive:
                         diff += max(0, payoffs_alt - payoffs_act)
@@ -141,7 +163,7 @@ class MaxEntropyNash():
             sum_two = 0
             for j, action_b in enumerate(self.action_space):
                 if j != i:
-                    sum_two += dual_vars[(action_a, action_b)] * self.payoff_gain(action_b, action_a)
+                    sum_two += dual_vars[(action_a, action_b)] * self.payoff_gains[(action_b, action_a)]
             sum_one += np.exp(-sum_two)
         return sum_one
 
@@ -150,7 +172,7 @@ class MaxEntropyNash():
         sum_one = 0
         for action in self.action_space:
             if action != a:
-                sum_one += dual_vars[(a, action)]*self.payoff_gain(action, a)
+                sum_one += dual_vars[(a, action)]*self.payoff_gains[(action, a)]
 
         log_p = -sum_one - np.log(self.Z(dual_vars))
         return np.exp(log_p)
@@ -160,7 +182,7 @@ class MaxEntropyNash():
         final_sum = 0
         for p2_action in self.action_space:
             p_p2 = self.P(dual_vars, p2_action)
-            p_gain = self.payoff(action_prime, p2_action) - self.payoff(action, p2_action)
+            p_gain = self.payoff_map[(action_prime, p2_action)] - self.payoff_map[(action, p2_action)]
 
             final_sum += (p_a*p_p2) * max(0, p_gain)
         return final_sum
@@ -170,7 +192,7 @@ class MaxEntropyNash():
         final_sum = 0
         for p2_action in self.action_space:
             p_p2 = self.P(dual_vars, p2_action)
-            p_gain = self.payoff(action_prime, p2_action) - self.payoff(action, p2_action)
+            p_gain = self.payoff_map[(action_prime, p2_action)] - self.payoff_map[(action, p2_action)]
             final_sum += (p_a*p_p2) * max(0, -p_gain)
         return final_sum
 
@@ -179,7 +201,7 @@ class MaxEntropyNash():
         pos = neg = 0
         for p2_action in self.action_space:
             p_p2 = self.P(dual_vars, p2_action)
-            p_gain = self.payoff(action_prime, p2_action) - self.payoff(action, p2_action)
+            p_gain = self.payoff_map[(action_prime, p2_action)] - self.payoff_map[(action, p2_action)]
 
             pos += (p_a*p_p2) * max(0, p_gain)
             neg += (p_a*p_p2) * max(0, -p_gain)
@@ -188,7 +210,7 @@ class MaxEntropyNash():
     def abs_gain(self, action, action_prime):
         total = 0
         for p2_action in self.action_space:
-            p_gain = abs(self.payoff(action_prime, p2_action) - self.payoff(action, p2_action))
+            p_gain = abs(self.payoff_map[(action_prime, p2_action)] - self.payoff_map[(action, p2_action)])
             total += p_gain
         return total
 
@@ -309,10 +331,84 @@ def test_maxent_nash():
         # matchup[action_to_index[name_i]][action_to_index[name_j]] = (name_i, name_j)
         # matchup[action_to_index[name_j]][action_to_index[name_i]] = (name_j, name_i)
 
+    print(M)
     maxent_nash = MaxEntropyNash(M, action_space, action_to_index)
-    maxent_nash.plot()
-    maxent_nash.print()
+    #maxent_nash.plot()
+    #maxent_nash.print()
 
-test_spearman()
-test_alpha_rank()
-test_maxent_nash()
+
+def poker_payoffs():
+    # This will be our meta_game action space
+    action_space = []
+    poker_file = 'new_logs.csv'
+    # We will survey the csv file to fill our action space
+    with open(poker_file, mode='r') as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        matches = []
+        pay = {}
+        for row in csv_reader:
+            i = row["Player 1"]
+            j = row["Player 2"]
+            match = (i, j)
+            matchPrime = (j, i)
+            p = float(row["Earnings"])
+            if i not in action_space:
+                action_space.append(i)
+
+            if j not in action_space:
+                action_space.append(j)
+
+            if (i in action_space) and (j in action_space):
+                if (match in matches) or (matchPrime in matches):
+                    if match in matches:
+                        pay[match] += p
+                    else:
+                        pay[matchPrime] += p
+                else:
+                    matches.append(match)
+                    pay[match] = p
+
+    # Create action_to_index utility dictionary
+    index = 0
+    action_to_index = {}
+    for action in action_space:
+        action_to_index[action] = index
+        index += 1
+    print(action_to_index)
+
+    # Create payoff matrix
+    M = np.full((len(action_space), len(action_space)), 0.0)
+    # matchup = [[None]*len(action_space) for i in range(len(action_space))]
+    for match, p in pay.items():
+        name_i, name_j = match
+
+        M[action_to_index[name_i]][action_to_index[name_j]] = p
+        M[action_to_index[name_j]][action_to_index[name_i]] = -p
+        # matchup[action_to_index[name_i]][action_to_index[name_j]] = (name_i, name_j)
+        # matchup[action_to_index[name_j]][action_to_index[name_i]] = (name_j, name_i)
+
+    print(M)
+    maxent_nash = MaxEntropyNash(M, action_space, action_to_index)
+
+
+#print("SPEARMAN")
+#test_spearman()
+#print("\n\n\nALPHARANK")
+#test_alpha_rank()
+#print("\n\n\nMAXENT NASH")
+#test_maxent_nash()
+
+#import cProfile, pstats, io
+#from pstats import SortKey
+#pr = cProfile.Profile()
+#pr.enable()
+## ... do something ...
+#poker_payoffs()
+#pr.disable()
+#s = io.StringIO()
+#sortby = SortKey.CUMULATIVE
+#ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+#ps.print_stats()
+#print(s.getvalue())
+
+poker_payoffs()
