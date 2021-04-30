@@ -10,17 +10,17 @@ def max_entropy_nash(A):
         cp.sum(x) == 1,
         x >= 0
     ]
-    cp.Problem(cp.Maximize(z), bounds).solve(solver='GLPK')
+    cp.Problem(cp.Maximize(z), bounds).solve()#solver='GLPK')
     minimax_value = z.value
 
-    # x = cp.Variable(A.shape[0])
-    # bounds = [
-    #     A.T @ x == minimax_value,
-    #     cp.sum(x) == 1,
-    #     x >= 0
-    # ]
-    # cp.Problem(cp.Maximize(cp.sum(cp.entr(x))), bounds).solve()
-
+    x = cp.Variable(A.shape[0])
+    bounds = [
+        minimax_value - A.T @ x <= 0,
+        cp.sum(x) == 1,
+        x >= 0
+    ]
+    cp.Problem(cp.Maximize(cp.sum(cp.entr(x))), bounds).solve()
+    # print(x.value)
     # x = pd.Series(x.value, A.index)
     # y = pd.Series(bounds[0].dual_value, A.columns)
     return x.value#, bounds[0].dual_value
