@@ -130,11 +130,13 @@ class MaxEntropyNash():
             for j, action_b in enumerate(self.action_space):
                 self.payoff_gains[(action_a, action_b)] = self.payoff_gain(action_a, action_b)
 
-        self.log_grad_descent(self.dual_variables, self.joint, verbose=False, rounds=1000)
+        self.log_grad_descent(self.dual_variables, self.joint, verbose=False, rounds=100)
         probs = {}
         for action in action_space:
             probs[action] = self.P(self.dual_variables, action)
-            print(action, ": ", self.P(self.dual_variables, action))
+        probs = dict(reversed(sorted(probs.items(), key=lambda item: item[1])))
+        for action, prob in probs.items():
+            print(action, ": ", prob)
 
     def payoff(self, action_1, action_2):
         return self.payoff_map[(action_1, action_2)]
@@ -338,57 +340,31 @@ def test_maxent_nash():
 
 
 def poker_payoffs():
-    # This will be our meta_game action space
     action_space = []
-    poker_file = 'new_logs.csv'
-    # We will survey the csv file to fill our action space
-    with open(poker_file, mode='r') as csv_file:
-        csv_reader = csv.DictReader(csv_file)
-        matches = []
-        pay = {}
-        for row in csv_reader:
-            i = row["Player 1"]
-            j = row["Player 2"]
-            match = (i, j)
-            matchPrime = (j, i)
-            p = float(row["Earnings"])
-            if i not in action_space:
-                action_space.append(i)
-
-            if j not in action_space:
-                action_space.append(j)
-
-            if (i in action_space) and (j in action_space):
-                if (match in matches) or (matchPrime in matches):
-                    if match in matches:
-                        pay[match] += p
-                    else:
-                        pay[matchPrime] += p
-                else:
-                    matches.append(match)
-                    pay[match] = p
-
-    # Create action_to_index utility dictionary
-    index = 0
     action_to_index = {}
-    for action in action_space:
-        action_to_index[action] = index
-        index += 1
-    print(action_to_index)
+    M = []
+    poker_file = "payoffs.csv"
+    with open(poker_file, mode="r") as csv_file:
+        csv_reader = csv.reader(csv_file)
+        first_row = True
+        for row in csv_reader:
+            if first_row:
+                first_row = False
+                action_space = row[1:]
+                M = np.zeros((len(action_space), len(action_space)))
+                index = 0
+                for action in action_space:
+                    action_to_index[action] = index
+                    index += 1
+            else:
+                name = row[0]
+                for i, pay in enumerate(row[1:]):
+                    M[i, action_to_index[name]] = pay
 
-    # Create payoff matrix
-    M = np.full((len(action_space), len(action_space)), 0.0)
-    # matchup = [[None]*len(action_space) for i in range(len(action_space))]
-    for match, p in pay.items():
-        name_i, name_j = match
-
-        M[action_to_index[name_i]][action_to_index[name_j]] = p
-        M[action_to_index[name_j]][action_to_index[name_i]] = -p
-        # matchup[action_to_index[name_i]][action_to_index[name_j]] = (name_i, name_j)
-        # matchup[action_to_index[name_j]][action_to_index[name_i]] = (name_j, name_i)
-
+    M = -M
     print(M)
     maxent_nash = MaxEntropyNash(M, action_space, action_to_index)
+    #alpha = alpharank.compute(M, alpha=1e2)
 
 
 #print("SPEARMAN")
