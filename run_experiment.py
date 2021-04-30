@@ -47,6 +47,10 @@ def compute_normalized_score(result, game_count):
 def compute_win_rate(result, game_count):
     return compute_score(np.sign(result), game_count)
 
+def compute_score_nash(result, game_count):
+    assert np.equal(np.triu(result), result).all()
+    return max_entropy_nash(result - result.T)
+
 # def variance_experiment(event_df, score_fn, selection_size):
 #     event_size = len(event_df)
 #     event_df = event_df.reset_index()
@@ -179,17 +183,29 @@ def print_ranking(score, player_names):
     for r in ranking:
         print(*r)
 
+def print_mat(x):
+    print(x*5)
+
 def print_all_rankings(df, score_fn):
     events = set(df['event'])
     for event in list(events):
         print(event)
         event_data = df[df['event'] == event]
         event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_data)
+        print(event_matrix)
+        print(game_count_matrix)
         scores = score_fn(event_matrix, game_count_matrix)
-        print_ranking(scores,player_ids)
-
+        ranking = list(reversed(sorted([(s,i,n) for i, (s, n) in enumerate(zip(scores, player_ids))])))
+        for r in ranking:
+            print(*r)
+        indicies = [i for s,i,n in ranking]
+        eval_matrix = event_matrix[indicies]
+        eval_matrix = eval_matrix - eval_matrix.T
+        ordered_mat = np.zeros_like(eval_matrix)
+        ordered_mat[indicies] = eval_matrix
+        # print(ordered_mat)
+        # print(event_matrix - event_matrix.T)
 
 if __name__ == "__main__":
     fname = sys.argv[1]
-    df = pandas.read_csv(fname)
-    print_all_rankings(df,max_entropy_nash)
+    print_all_rankings(df,compute_score_nash)

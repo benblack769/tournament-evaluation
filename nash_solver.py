@@ -1,7 +1,7 @@
 import cvxpy as cp
 import numpy as np
 
-def max_entropy_nash(A, game_counts=None):
+def max_entropy_nash(A):
     x = cp.Variable(A.shape[0])
     z = cp.Variable()
 
