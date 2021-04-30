@@ -1,6 +1,8 @@
 import pandas
 import numpy as np
 import random
+import sys
+from nash_solver import max_entropy_nash
 
 def csv_data_to_matrix(event_data):
     event_data = event_data.reset_index()
@@ -177,6 +179,17 @@ def print_ranking(score, player_names):
     for r in ranking:
         print(*r)
 
+def print_all_rankings(df, score_fn):
+    events = set(df['event'])
+    for event in list(events):
+        print(event)
+        event_data = df[df['event'] == event]
+        event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_data)
+        scores = score_fn(event_matrix, game_count_matrix)
+        print_ranking(scores,player_ids)
+
+
 if __name__ == "__main__":
-    df = pandas.read_csv("clean_chess_data.csv")
-    run_experiment(df,compute_score)
+    fname = sys.argv[1]
+    df = pandas.read_csv(fname)
+    print_all_rankings(df,max_entropy_nash)
