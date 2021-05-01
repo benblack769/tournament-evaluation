@@ -1,31 +1,42 @@
 import cvxpy as cp
 import numpy as np
 
-def equilibrium(A):
+def max_entropy_nash(A):
     x = cp.Variable(A.shape[0])
     z = cp.Variable()
 
     bounds = [
         z - A.T @ x <= 0,
         cp.sum(x) == 1,
-        x >= 0]
-    cp.Problem(cp.Maximize(z), bounds).solve()
+        x >= 0
+    ]
+    cp.Problem(cp.Maximize(z), bounds).solve()#solver='GLPK')
+    minimax_value = z.value
 
+    x = cp.Variable(A.shape[0])
+    bounds = [
+        minimax_value - A.T @ x <= 0,
+        cp.sum(x) == 1,
+        x >= 0
+    ]
+    cp.Problem(cp.Maximize(cp.sum(cp.entr(x))), bounds).solve()
+    # print(x.value)
     # x = pd.Series(x.value, A.index)
     # y = pd.Series(bounds[0].dual_value, A.columns)
-    return x.value, bounds[0].dual_value
+    return x.value#, bounds[0].dual_value
 
-matrix = np.array([
-    [0,1,-1],
-    [-1,0,1],
-    [1,-1,0],
-])
-print(equilibrium(matrix))
+if __name__ == "__main__":
+    matrix = np.array([
+        [0,1,-1],
+        [-1,0,1],
+        [1,-1,0],
+    ])
+    print(max_entropy_nash(matrix))
 
-matrix = np.array([
-    [0,1,-1,-1],
-    [-1,0,1,1],
-    [1,-1,0,0],
-    [1,-1,0,0],
-])
-print(equilibrium(matrix))
+    matrix = np.array([
+        [0,1,-1,-1],
+        [-1,0,1,1],
+        [1,-1,0,0],
+        [1,-1,0,0],
+    ])
+    print(max_entropy_nash(matrix))
