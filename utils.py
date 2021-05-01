@@ -137,6 +137,7 @@ class MaxEntropyNash():
         probs = dict(reversed(sorted(probs.items(), key=lambda item: item[1])))
         for action, prob in probs.items():
             print(action, ": ", prob)
+        self.print()
 
     def payoff(self, action_1, action_2):
         return self.payoff_map[(action_1, action_2)]
@@ -338,12 +339,28 @@ def test_maxent_nash():
     #maxent_nash.plot()
     #maxent_nash.print()
 
+from run_experiment import compute_score, compute_normalized_score, compute_win_rate, compute_score_nash
+from run_experiment import print_ranking
+import numpy as np
+import pandas
+
+
+def compute_nash():
+    def eval_payoff(score_fn):
+        df = pandas.read_csv("payoffs.csv", index_col=0)
+    
+        matrix = df.reset_index(drop=True).values
+        print(matrix)
+        scores = score_fn(np.triu(matrix), np.ones_like(matrix))
+        print_ranking(scores, df.index)
+    
+    eval_payoff(compute_score_nash)
 
 def poker_payoffs():
     action_space = []
     action_to_index = {}
     M = []
-    poker_file = "payoffs.csv"
+    poker_file = "payoffs_clipped.csv"
     with open(poker_file, mode="r") as csv_file:
         csv_reader = csv.reader(csv_file)
         first_row = True
@@ -388,3 +405,4 @@ def poker_payoffs():
 #print(s.getvalue())
 
 poker_payoffs()
+compute_nash()
