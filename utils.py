@@ -344,12 +344,15 @@ from run_experiment import print_ranking
 import numpy as np
 import pandas
 
+np.set_printoptions(linewidth=200)
 
 def compute_nash():
     def eval_payoff(score_fn):
-        df = pandas.read_csv("payoffs.csv", index_col=0)
+        df = pandas.read_csv("payoffs2.csv", index_col=0)
     
-        matrix = df.reset_index(drop=True).values
+        matrix = df.reset_index(drop=True)
+        print(matrix.columns.values)
+        matrix = matrix.values
         print(matrix)
         scores = score_fn(np.triu(matrix), np.ones_like(matrix))
         print_ranking(scores, df.index)
@@ -404,5 +407,5 @@ def poker_payoffs():
 #ps.print_stats()
 #print(s.getvalue())
 
-poker_payoffs()
+#poker_payoffs()
 compute_nash()
