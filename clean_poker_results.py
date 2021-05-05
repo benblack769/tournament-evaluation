@@ -22,6 +22,7 @@ with open('new_logs.csv', 'w+', newline='') as csvfile:
                 with open(logfile2) as log2:
                     reader1 = csv.reader(log1, delimiter=':')
                     reader2 = csv.reader(log2, delimiter=':')
+                    rowCount = 0
                     for row1, row2 in zip(reader1, reader2):
                         if row1[0] != "STATE" or row2[0] != "STATE":
                             continue
@@ -56,7 +57,11 @@ with open('new_logs.csv', 'w+', newline='') as csvfile:
                                 winrate = 0
                             else:
                                 winrate = (combined_score + total_score) / (2 * total_score)
-                            final_rows.append([year, second_names[0], second_names[1], combined_score, winrate])
+                            final_rows.append([year, second_names[1], second_names[0], combined_score, winrate])
+                            rowCount+=1
+                            #if rowCount > 10:
+                            #    break
+            #break
         for i, row in enumerate(final_rows):
             row.append(len(name_set))
             writer.writerow(row)
