@@ -25,7 +25,12 @@ def compute_nash(payoffs, keys):
         print_ranking(scores, keys)
     
     eval_payoff(compute_score_nash, payoffs, keys)
-agents, payoffs = extract_payoffs.generate_payoffs()
+agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=0.01)
 print(agents)
 print(payoffs)
 compute_nash(payoffs, agents)
+
+# TODO: Run experiment 10 times per sampel size
+# TODO: Compare ranking to 100% ranking, and average these correlation coefficients
+# TODO: Decide a correct scale for data percentages
+# TODO: Create mapping from agent names -> official index for use as a standard comparison for spearman

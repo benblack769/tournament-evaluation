@@ -1,9 +1,17 @@
 # !/usr/local/bin/python
 import glob
 import csv
+import random
 from collections import defaultdict
 
 def generate_payoffs(included_ratio=1.0):
+
+    number_of_rows = 22874594
+    indices = list(range(number_of_rows))
+    random.shuffle(indices)
+    print(indices[:100])
+    selected_indices = set(indices[:int(included_ratio*number_of_rows)])
+
     matchups = defaultdict(int)
     winrates = defaultdict(float)
     matches = defaultdict(int)
@@ -11,9 +19,13 @@ def generate_payoffs(included_ratio=1.0):
     final_rows = []
     matchup_payouts = defaultdict(float)
     matchup_counts = defaultdict(int)
+    index = 0
     with open("new_logs.csv") as log:
         reader = csv.DictReader(log)
         for row in reader:
+            if index not in selected_indices:
+                index += 1
+                continue
             player1 = row["Player 1"]
             player2 = row["Player 2"]
             matchup = (player1, player2)
@@ -30,6 +42,7 @@ def generate_payoffs(included_ratio=1.0):
             matches[player1] += 1
             winrates[player2] -= score
             matches[player2] += 1
+            index+=1
     names = list(name_set)
     final_rows = []
     winrate_list = []
