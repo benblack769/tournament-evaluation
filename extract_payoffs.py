@@ -74,6 +74,6 @@ def generate_payoffs(included_ratio=1.0):
         payoffs.append(row[1:-1])
 
 
-    keys = new_first_row[1:]
+    keys = new_first_row[1:-1]
     return keys, payoffs 
     
