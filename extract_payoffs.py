@@ -1,16 +1,17 @@
 # !/usr/local/bin/python
-import glob
 import csv
 import random
+from tqdm import tqdm
 from collections import defaultdict
+
 
 def generate_payoffs(included_ratio=1.0):
 
     number_of_rows = 22874594
+    sample_size = int(included_ratio*number_of_rows)
     indices = list(range(number_of_rows))
     random.shuffle(indices)
-    print(indices[:100])
-    selected_indices = set(indices[:int(included_ratio*number_of_rows)])
+    selected_indices = set(indices[:sample_size])
 
     matchups = defaultdict(int)
     winrates = defaultdict(float)
@@ -22,10 +23,14 @@ def generate_payoffs(included_ratio=1.0):
     index = 0
     with open("new_logs.csv") as log:
         reader = csv.DictReader(log)
-        for row in reader:
+        for row in tqdm(reader, total=number_of_rows, leave=False):
+            if len(selected_indices) == 0:
+                break
             if index not in selected_indices:
                 index += 1
                 continue
+            else:
+                selected_indices.remove(index)
             player1 = row["Player 1"]
             player2 = row["Player 2"]
             matchup = (player1, player2)
@@ -42,7 +47,7 @@ def generate_payoffs(included_ratio=1.0):
             matches[player1] += 1
             winrates[player2] -= score
             matches[player2] += 1
-            index+=1
+            index += 1
     names = list(name_set)
     final_rows = []
     winrate_list = []
@@ -76,17 +81,15 @@ def generate_payoffs(included_ratio=1.0):
         wr = max(wr, -750)
         new_row.append(wr)
         new_values.append(new_row)
-        
-    new_values.sort(key = lambda x: x[-1])
+
+    new_values.sort(key=lambda x: x[-1])
     new_first_row = [""]
     new_first_row += [row[0] for row in new_values[::-1]]
     new_first_row.append("Winrate")
-    new_values.sort(key = lambda x: x[-1])
+    new_values.sort(key=lambda x: x[-1])
     payoffs = []
     for row in new_values[::-1]:
         payoffs.append(row[1:-1])
 
-
     keys = new_first_row[1:-1]
-    return keys, payoffs 
-    
+    return keys, payoffs

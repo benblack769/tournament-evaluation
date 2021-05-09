@@ -63,7 +63,10 @@ def alpha_rank(payoff_tables, alpha=1e2):
 
 def test_alpha_rank():
     game = pyspiel.load_matrix_game("matrix_rps")
-    payoff_tables = utils.game_payoffs_array(game)
+    payoff_tables = utils.game_payoffs_array(game) * 2
+    print()
+    print(payoff_tables)
+    print()
 
     # Convert to heuristic payoff tables
     payoff_tables = [heuristic_payoff_table.from_matrix_game(payoff_tables[0]),
@@ -79,22 +82,22 @@ def test_alpha_rank():
     # single-population dynamics.
     _, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
 
-    print(payoff_tables[0].num_players, payoff_tables[0].num_strategies, payoff_tables[0]._payoffs)
+    #print(payoff_tables[0].num_players, payoff_tables[0].num_strategies, payoff_tables[0]._payoffs)
     (rhos, rho_m, pi, num_profiles, num_strats_per_population) = alpha_rank(payoff_tables, alpha=1e2)
 
     # Report results
-    # alpharank.print_results(payoff_tables, payoffs_are_hpt_format, pi=pi)
+    alpharank.print_results(payoff_tables, payoffs_are_hpt_format, pi=pi)
 
-    payoff_tables = alpharank_example.get_kuhn_poker_data(num_players=2)
-    is_symmetric, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
-    print(is_symmetric)
-    print(len(payoff_tables))
-    print(payoff_tables[0].shape, payoff_tables[0])
-    print(payoff_tables[1].shape, payoff_tables[1])
+    payoff_tables = alpharank_example.get_kuhn_poker_data(num_players=3)
+    #is_symmetric, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
+    print(payoff_tables[0])
+    print(payoff_tables[1])
+    print(payoff_tables[2])
     #print(payoff_tables[0].num_players, payoff_tables[0].num_strategies, payoff_tables[0]._payoffs)
     #print(payoff_tables[1].num_players, payoff_tables[1].num_strategies, payoff_tables[1]._payoffs)
     #print(payoff_tables[2].num_players, payoff_tables[2].num_strategies, payoff_tables[2]._payoffs)
-    # alpharank.compute_and_report_alpharank(payoff_tables, alpha=1e2)
+    print(alpharank.sweep_pi_vs_alpha(payoff_tables, visualize=False))
+    #alpharank.compute_and_report_alpharank(payoff_tables, alpha=1e2)
 
 
 class MaxEntropyNash():
@@ -408,4 +411,4 @@ def poker_payoffs():
 #print(s.getvalue())
 
 #poker_payoffs()
-compute_nash()
+#compute_nash()
