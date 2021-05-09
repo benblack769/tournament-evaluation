@@ -199,10 +199,9 @@ def print_all_rankings(df, score_fn):
         for r in ranking:
             print(*r)
         indicies = [i for s,i,n in ranking]
-        eval_matrix = event_matrix[indicies]
-        eval_matrix = eval_matrix - eval_matrix.T
-        ordered_mat = np.zeros_like(eval_matrix)
-        ordered_mat[indicies] = eval_matrix
+        event_matrix = event_matrix - event_matrix.T
+        ordered_mat = np.zeros_like(event_matrix)
+        ordered_mat[indicies] = event_matrix
         # print(ordered_mat)
         # print(event_matrix - event_matrix.T)
 
