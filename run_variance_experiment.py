@@ -1,5 +1,6 @@
 # !/usr/local/bin/python
 import time
+import random
 import numpy as np
 from tqdm import tqdm, trange
 from open_spiel.python.egt import alpharank
@@ -28,104 +29,149 @@ def compute_alpha(payoff, keys):
 
 
 def compute_nash(payoff_matrix, keys):
-    def eval_payoff(score_fn, matrix, keys):
-        return score_fn(np.triu(matrix), np.ones_like(matrix))
+    def eval_payoff(score_func, matrix, keys):
+        return score_func(np.triu(matrix), np.ones_like(matrix))
     return eval_payoff(compute_score_nash, payoff_matrix, keys)
 
 
+def compute_winrate(payoff_matrix, keys):
+    payoff_matrix = np.asarray(payoff_matrix)
+    row_sums = np.sum(payoff_matrix, axis=1)
+    nonzero_payoffs = np.count_nonzero(payoff_matrix != 0, axis=0)
+    return (row_sums / nonzero_payoffs) + 750
+
+
 def get_ranking(score_list, agent_list):
-    _, agents_s = zip(*sorted(zip(score_list, agent_list), reverse=True))
+    scores_s, agents_s = zip(*sorted(zip(score_list, agent_list), reverse=True))
     ranking = []
     for agent in agents_s:
         ranking.append(agent_to_index[agent])
-    return ranking
+    return ranking, scores_s
 
 
 def iterative_ranking(payoff_matrix, all_agents, score_fn):
     current_agents = all_agents.copy()
     payoff_matrix = np.asarray(payoff_matrix)
     final_ranking = []
+    final_scores = []
     while len(final_ranking) < len(all_agents):
         # Compute scores and rank
         scores = score_fn(payoff_matrix, current_agents)
-        ranking = get_ranking(scores, current_agents)
+        ranking, scores = get_ranking(scores, current_agents)
+        #print("Scores: {}".format(scores))
+        #print("Ranking: {}".format(ranking))
 
         # Add anyone in the metagame to the ranking, in order
         indices_to_remove = []
         agents_to_remove = []
         for index, agent_id in enumerate(ranking):
             if scores[index] > 1e-7:
-                indices_to_remove.append(index)
-                agent_name = all_agents[agent_id]
+                agent_name = index_to_agent[agent_id]
+                indices_to_remove.append(current_agents.index(agent_name))
                 agents_to_remove.append(agent_name)
                 final_ranking.append(all_agents.index(agent_name))
+                final_scores.append(scores[index])
         # Remove ranked agents from payoff matrix and agent list
         for agent in agents_to_remove:
             current_agents.remove(agent)
         payoff_matrix = np.delete(payoff_matrix, indices_to_remove, axis=0)
         payoff_matrix = np.delete(payoff_matrix, indices_to_remove, axis=1)
 
-    return final_ranking
+    return final_ranking, final_scores
 
 
 # TODO: Run experiment 10 times per sample size
+experiment_id = random.randint(0,10000)
+file1 = open("experiment_{}.txt".format(experiment_id), "w")
+file1.write("Experiment Data \n")
+
 agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=1.0)
+file1.write("Agents: " + str(agents) + "\n")
+print(agents)
+print(np.asarray(payoffs))
 agent_to_index = {}
 index_to_agent = []
 for i, agent in enumerate(agents):
     agent_to_index[agent] = i
     index_to_agent.append(agent)
 
-time.sleep(100)
-total_winrate_ranking = get_ranking(range(len(agents), 0, -1), agents)
+#scores = compute_winrate(payoffs, agents)
+#total_winrate_ranking = get_ranking(scores, agents)
+
+total_winrate_ranking, wscore = iterative_ranking(payoffs, agents, compute_winrate)
 print(total_winrate_ranking)
 
-total_alpha_ranking = iterative_ranking(payoffs, agents, compute_alpha)
+total_alpha_ranking, ascore = iterative_ranking(payoffs, agents, compute_alpha)
 print(total_alpha_ranking)
 
-total_nash_ranking = iterative_ranking(payoffs, agents, compute_nash)
+total_nash_ranking, nscore = iterative_ranking(payoffs, agents, compute_nash)
 print(total_nash_ranking)
+file1.writelines([
+    "Winrate Ranking: " + str(total_winrate_ranking) + "\n",
+    "Meta Nash Ranking: " + str(total_nash_ranking) + "\n",
+    "Alpharank Ranking: " + str(total_alpha_ranking) + "\n",
+])
 
-
+N = 50
 winrate_spears = []
 nash_spears = []
 alpha_spears = []
-scales = [i/10.0 for i in range(1, 11, 2)]
-scales = [0.01] + [0.05] + scales
+scales = [i/10.0 for i in range(1, 10)]
+scales = [0.0001] + [0.001] + [0.01] + scales
+file1.write("Scales: " + str(scales) + "\n")
+file1.flush()
 scales_loop = tqdm(scales, leave=False)
 for data_ratio in scales_loop:
+    file1.write("Testing samples of {}% of data...\n".format(data_ratio * 100))
     scales_loop.set_description("Testing {}% of data".format(data_ratio*100))
     total_winrate_spear = 0
     total_nash_spear = 0
     total_alpha_spear = 0
-    range_loop = tqdm(trange(5), leave=False)
+    range_loop = tqdm(trange(N), leave=False)
     for i in range_loop:
-        range_loop.set_description("Trial {}/5".format(i))
+        range_loop.set_description("Trial {}/{}".format(i, N))
         agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=data_ratio)
         alpha_payoffs = payoffs.copy()
         alpha_agents = agents.copy()
 
         # Agents are ranked according to winrate by default
-        winrate_ranking = get_ranking(range(len(agents), 0, -1), agents)
-        total_winrate_spear += spearman(total_winrate_ranking, winrate_ranking)
+        winrate_ranking, _ = iterative_ranking(payoffs, agents, compute_winrate)
+        winrate_spear = spearman(total_winrate_ranking, winrate_ranking)
+        total_winrate_spear += winrate_spear
 
         # Compute Nash Rank
-        nash_ranking = iterative_ranking(payoffs, agents, compute_nash)
-        total_nash_spear += spearman(total_nash_ranking, nash_ranking)
+        nash_ranking, _ = iterative_ranking(payoffs, agents, compute_nash)
+        nash_spear = spearman(total_nash_ranking, nash_ranking)
+        total_nash_spear += nash_spear
 
         # Compute Alpharank
-        alpha_ranking = iterative_ranking(payoffs, agents, compute_alpha)
-        total_alpha_spear += spearman(total_alpha_ranking, alpha_ranking)
+        alpha_ranking, _ = iterative_ranking(payoffs, agents, compute_alpha)
+        alpha_spear = spearman(total_alpha_ranking, alpha_ranking)
+        total_alpha_spear += alpha_spear
 
-    average_winrate_spear = total_winrate_spear / 5
+        file1.write("\t" + str(i) + ": " + str(winrate_spear) + ", " + str(nash_spear) + ", " + str(alpha_spear) + "\n")
+
+    average_winrate_spear = total_winrate_spear / N
     winrate_spears.append(average_winrate_spear)
 
-    average_nash_spear = total_nash_spear / 5
+    average_nash_spear = total_nash_spear / N
     nash_spears.append(average_nash_spear)
 
-    average_alpha_spear = total_alpha_spear / 5
+    average_alpha_spear = total_alpha_spear / N
     alpha_spears.append(average_alpha_spear)
+    file1.writelines([
+        "\tWinrate Spearman: " + str(average_winrate_spear) + "\n",
+        "\tMeta Nash Spearman: " + str(average_nash_spear) + "\n",
+        "\tAlpharank Spearman: " + str(average_alpha_spear) + "\n",
+    ])
+    file1.flush()
 
 print(winrate_spears)
 print(nash_spears)
 print(alpha_spears)
+file1.writelines([
+    "Winrate Spearmans: " + str(winrate_spears) + "\n",
+    "Meta Nash Spearmans: " + str(nash_spears) + "\n",
+    "Alpharank Spearmans: " + str(alpha_spears) + "\n",
+])
+file1.close()

@@ -70,11 +70,11 @@ def generate_payoffs(included_ratio=1.0):
         winrate_list.append(wr)
         final_rows.append(values)
 
-    winrate_list, indices = map(list, zip(*sorted(zip(winrate_list, range(1, len(winrate_list)+1)))))
+    name_list, indices = map(list, zip(*sorted(zip(names, range(1, len(winrate_list)+1)))))
     new_values = []
     for row in final_rows:
         new_row = [row[0]]
-        for index in indices[::-1]:
+        for index in indices[::]:
             new_row.append(row[index])
         wr = sum(new_row[1:]) / len([v for v in new_row[1:] if v != 0])
         wr = min(wr, 750)
@@ -82,11 +82,11 @@ def generate_payoffs(included_ratio=1.0):
         new_row.append(wr)
         new_values.append(new_row)
 
-    new_values.sort(key=lambda x: x[-1])
+    new_values.sort(reverse=True, key=lambda x: x[0])
     new_first_row = [""]
     new_first_row += [row[0] for row in new_values[::-1]]
     new_first_row.append("Winrate")
-    new_values.sort(key=lambda x: x[-1])
+    new_values.sort(reverse=True, key=lambda x: x[0])
     payoffs = []
     for row in new_values[::-1]:
         payoffs.append(row[1:-1])
