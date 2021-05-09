@@ -1,5 +1,6 @@
 # !/usr/local/bin/python
 import time
+import multiprocessing
 import random
 import numpy as np
 from tqdm import tqdm, trange
@@ -112,7 +113,27 @@ file1.writelines([
     "Alpharank Ranking: " + str(total_alpha_ranking) + "\n",
 ])
 
-N = 50
+
+def test_sample(data_ratio):
+    agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=data_ratio)
+
+    # Agents are ranked according to winrate by default
+    winrate_ranking, _ = iterative_ranking(payoffs, agents, compute_winrate)
+    winrate_spear = spearman(total_winrate_ranking, winrate_ranking)
+
+    # Compute Nash Rank
+    nash_ranking, _ = iterative_ranking(payoffs, agents, compute_nash)
+    nash_spear = spearman(total_nash_ranking, nash_ranking)
+
+    # Compute Alpharank
+    alpha_ranking, _ = iterative_ranking(payoffs, agents, compute_alpha)
+    alpha_spear = spearman(total_alpha_ranking, alpha_ranking)
+
+    file1.write("\t" + str(i) + ": " + str(winrate_spear) + ", " + str(nash_spear) + ", " + str(alpha_spear) + "\n")
+    return [winrate_spear, nash_spear, alpha_spear]
+
+
+N = 100
 winrate_spears = []
 nash_spears = []
 alpha_spears = []
@@ -124,40 +145,19 @@ scales_loop = tqdm(scales, leave=False)
 for data_ratio in scales_loop:
     file1.write("Testing samples of {}% of data...\n".format(data_ratio * 100))
     scales_loop.set_description("Testing {}% of data".format(data_ratio*100))
-    total_winrate_spear = 0
-    total_nash_spear = 0
-    total_alpha_spear = 0
-    range_loop = tqdm(trange(N), leave=False)
-    for i in range_loop:
-        range_loop.set_description("Trial {}/{}".format(i, N))
-        agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=data_ratio)
-        alpha_payoffs = payoffs.copy()
-        alpha_agents = agents.copy()
 
-        # Agents are ranked according to winrate by default
-        winrate_ranking, _ = iterative_ranking(payoffs, agents, compute_winrate)
-        winrate_spear = spearman(total_winrate_ranking, winrate_ranking)
-        total_winrate_spear += winrate_spear
+    with multiprocessing.Pool() as a_pool:
+        result = list(tqdm(a_pool.map(test_sample, [data_ratio] * N), total=N))
+        result = np.asarray(result)
 
-        # Compute Nash Rank
-        nash_ranking, _ = iterative_ranking(payoffs, agents, compute_nash)
-        nash_spear = spearman(total_nash_ranking, nash_ranking)
-        total_nash_spear += nash_spear
-
-        # Compute Alpharank
-        alpha_ranking, _ = iterative_ranking(payoffs, agents, compute_alpha)
-        alpha_spear = spearman(total_alpha_ranking, alpha_ranking)
-        total_alpha_spear += alpha_spear
-
-        file1.write("\t" + str(i) + ": " + str(winrate_spear) + ", " + str(nash_spear) + ", " + str(alpha_spear) + "\n")
-
-    average_winrate_spear = total_winrate_spear / N
+    spear_sums = [sum(col) for col in zip(*result)]
+    average_winrate_spear = spear_sums[0] / N
     winrate_spears.append(average_winrate_spear)
 
-    average_nash_spear = total_nash_spear / N
+    average_nash_spear = spear_sums[1] / N
     nash_spears.append(average_nash_spear)
 
-    average_alpha_spear = total_alpha_spear / N
+    average_alpha_spear = spear_sums[2] / N
     alpha_spears.append(average_alpha_spear)
     file1.writelines([
         "\tWinrate Spearman: " + str(average_winrate_spear) + "\n",
