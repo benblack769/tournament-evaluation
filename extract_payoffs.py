@@ -23,7 +23,7 @@ def generate_payoffs(included_ratio=1.0):
     index = 0
     with open("new_logs.csv") as log:
         reader = csv.DictReader(log)
-        for row in tqdm(reader, total=number_of_rows, leave=False):
+        for row in reader:
             if len(selected_indices) == 0:
                 break
             if index not in selected_indices:

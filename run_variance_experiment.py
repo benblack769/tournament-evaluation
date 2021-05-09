@@ -147,7 +147,7 @@ for data_ratio in scales_loop:
     scales_loop.set_description("Testing {}% of data".format(data_ratio*100))
 
     with multiprocessing.Pool() as a_pool:
-        result = list(tqdm(a_pool.map(test_sample, [data_ratio] * N), total=N))
+        result = list(tqdm(a_pool.imap(test_sample, [data_ratio] * N), total=N))
         result = np.asarray(result)
 
     spear_sums = [sum(col) for col in zip(*result)]
