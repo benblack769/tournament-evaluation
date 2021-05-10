@@ -2,6 +2,7 @@
 import time
 import multiprocessing
 import random
+from statistics import stdev
 import numpy as np
 from tqdm import tqdm, trange
 from open_spiel.python.egt import alpharank
@@ -133,7 +134,7 @@ def test_sample(data_ratio):
     return [winrate_spear, nash_spear, alpha_spear]
 
 
-N = 100
+N = 200
 winrate_spears = []
 nash_spears = []
 alpha_spears = []
@@ -146,11 +147,12 @@ for data_ratio in scales_loop:
     file1.write("Testing samples of {}% of data...\n".format(data_ratio * 100))
     scales_loop.set_description("Testing {}% of data".format(data_ratio*100))
 
-    with multiprocessing.Pool(processes=8) as a_pool:
+    with multiprocessing.Pool(processes=16) as a_pool:
         result = list(tqdm(a_pool.imap(test_sample, [data_ratio] * N), total=N))
         result = np.asarray(result)
 
     spear_sums = [sum(col) for col in zip(*result)]
+    spear_stdevs = [stdev(col) for col in zip(*result)]
     average_winrate_spear = spear_sums[0] / N
     winrate_spears.append(average_winrate_spear)
 
@@ -160,9 +162,12 @@ for data_ratio in scales_loop:
     average_alpha_spear = spear_sums[2] / N
     alpha_spears.append(average_alpha_spear)
     file1.writelines([
-        "\tWinrate Spearman: " + str(average_winrate_spear) + "\n",
-        "\tMeta Nash Spearman: " + str(average_nash_spear) + "\n",
-        "\tAlpharank Spearman: " + str(average_alpha_spear) + "\n",
+        "\tWinrate Spearman Mean: " + str(average_winrate_spear) + "\n",
+        "\tMeta Nash Spearman Mean: " + str(average_nash_spear) + "\n",
+        "\tAlpharank Spearman Mean: " + str(average_alpha_spear) + "\n",
+        "\tWinrate Spearman Standard Deviation: " + str(spear_stdevs[0]) + "\n",
+        "\tMeta Nash Spearman Standard Deviation: " + str(spear_stdevs[1]) + "\n",
+        "\tAlpharank Spearman Standard Deviation: " + str(spear_stdevs[2]) + "\n",
     ])
     file1.flush()
 
