@@ -23,7 +23,7 @@ def max_entropy_nash(A):
         ]
         cp.Problem(cp.Maximize(cp.sum(cp.entr(x))), bounds).solve()
         nash_result = x.value
-    except cvxpy.error.SolverError:
+    except cp.error.SolverError:
         # if the solver failed, then default back to the regular nash,
         # don't worry about the entropy maximation
         pass

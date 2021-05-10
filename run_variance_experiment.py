@@ -138,7 +138,7 @@ winrate_spears = []
 nash_spears = []
 alpha_spears = []
 scales = [i/10.0 for i in range(1, 10)]
-scales = [0.0001] + [0.001] + [0.01] + scales
+scales = [0.0001] + [0.001] + [0.01] + scales + [0.99] + [0.999] + [0.9999]
 file1.write("Scales: " + str(scales) + "\n")
 file1.flush()
 scales_loop = tqdm(scales, leave=False)
@@ -146,7 +146,7 @@ for data_ratio in scales_loop:
     file1.write("Testing samples of {}% of data...\n".format(data_ratio * 100))
     scales_loop.set_description("Testing {}% of data".format(data_ratio*100))
 
-    with multiprocessing.Pool() as a_pool:
+    with multiprocessing.Pool(processes=8) as a_pool:
         result = list(tqdm(a_pool.imap(test_sample, [data_ratio] * N), total=N))
         result = np.asarray(result)
 
