@@ -3,6 +3,8 @@ import csv
 import numpy as np
 from tqdm import tqdm
 from collections import defaultdict
+np.set_printoptions(linewidth=200)
+np.set_printoptions(suppress=True)
 
 
 def generate_data(included_ratio=1.0):
@@ -26,11 +28,27 @@ def generate_data(included_ratio=1.0):
     names = list(sorted(list(name_set)))
     for matchup, payout_list in matchup_payouts.items():
         matchup_payouts[matchup] = np.asarray(payout_list)
-        print(len(payout_list))
-    print(matchup_payouts)
-    print(names)
-    print(sorted(matchup_counts.values()))
-
     return names, matchup_payouts
 
-generate_data()
+
+def payoffs_from_matchups(agents, payoffs, sample_ratio=1.0):
+    payoff_matrix = np.zeros((len(agents), len(agents)))
+    for i, agent1 in enumerate(agents):
+        for j, agent2 in enumerate(agents):
+            matchup = (agent1, agent2)
+            payoff_array = payoffs[matchup]
+
+            if len(payoff_array) == 0:
+                payoff_matrix[i][j] = 0
+                continue
+ 
+            sample_count = int(sample_ratio * len(payoff_array))
+            sample_array = np.random.choice(payoff_array, size=sample_count, replace=False)
+            summed = 5 * np.sum(sample_array) / sample_count
+            clipped = min(max(summed, -750), 750)
+            payoff_matrix[i][j] = clipped
+    return payoff_matrix
+
+
+#agents, true_matchup_payoffs = generate_data()
+#payoff_matrix = payoffs_from_matchups(agents, true_matchup_payoffs)

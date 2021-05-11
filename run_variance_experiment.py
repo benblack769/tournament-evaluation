@@ -8,6 +8,7 @@ from tqdm import tqdm, trange
 from open_spiel.python.egt import alpharank
 from open_spiel.python.egt import heuristic_payoff_table, utils
 import extract_payoffs
+import extract_data
 from run_experiment import compute_score_nash
 from utils import spearman
 np.set_printoptions(linewidth=200)
@@ -83,31 +84,31 @@ def iterative_ranking(payoff_matrix, all_agents, score_fn):
 
 
 # TODO: Run experiment 10 times per sample size
-experiment_id = random.randint(0,10000)
-file1 = open("experiment_{}.txt".format(experiment_id), "w")
+experiment_id = random.randint(0, 10000)
+file1 = open("experiment_stratified_{}.txt".format(experiment_id), "w")
 file1.write("Experiment Data \n")
 
-agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=1.0)
-total_payoffs = np.asarray(payoffs)
-file1.write("Agents: " + str(agents) + "\n")
-print(agents)
-print(np.asarray(payoffs))
+true_agents, true_matchup_payoffs = extract_data.generate_data()
+true_payoff_matrix = extract_data.payoffs_from_matchups(true_agents, true_matchup_payoffs, sample_ratio=1.0)
+file1.write("Agents: " + str(true_agents) + "\n")
+print(true_agents)
+print(np.asarray(true_payoff_matrix))
 agent_to_index = {}
 index_to_agent = []
-for i, agent in enumerate(agents):
+for i, agent in enumerate(true_agents):
     agent_to_index[agent] = i
     index_to_agent.append(agent)
 
 #scores = compute_winrate(payoffs, agents)
 #total_winrate_ranking = get_ranking(scores, agents)
 
-total_winrate_ranking, wscore = iterative_ranking(payoffs, agents, compute_winrate)
+total_winrate_ranking, wscore = iterative_ranking(true_payoff_matrix, true_agents, compute_winrate)
 print(total_winrate_ranking)
 
-total_alpha_ranking, ascore = iterative_ranking(payoffs, agents, compute_alpha)
+total_alpha_ranking, ascore = iterative_ranking(true_payoff_matrix, true_agents, compute_alpha)
 print(total_alpha_ranking)
 
-total_nash_ranking, nscore = iterative_ranking(payoffs, agents, compute_nash)
+total_nash_ranking, nscore = iterative_ranking(true_payoff_matrix, true_agents, compute_nash)
 print(total_nash_ranking)
 file1.writelines([
     "Winrate Ranking: " + str(total_winrate_ranking) + "\n",
@@ -117,31 +118,30 @@ file1.writelines([
 
 
 def test_sample(data_ratio):
-    agents, payoffs = extract_payoffs.generate_payoffs(included_ratio=data_ratio)
+    payoffs = extract_data.payoffs_from_matchups(true_agents, true_matchup_payoffs, sample_ratio=data_ratio)
     print("Payoffs")
-    print(agents)
+    print(true_agents)
     print(np.asarray(payoffs))
-    errors = np.absolute(total_payoffs - payoffs) / 1500
+    errors = np.absolute(true_payoff_matrix - payoffs) / 1500
     print(errors)
     print(np.max(errors))
     print(np.mean(errors))
     print(np.min(errors))
 
     # Agents are ranked according to winrate by default
-    winrate_ranking, _ = iterative_ranking(payoffs, agents, compute_winrate)
+    winrate_ranking, _ = iterative_ranking(payoffs, true_agents, compute_winrate)
     winrate_spear = spearman(total_winrate_ranking, winrate_ranking)
     print("Winrate: ", winrate_ranking)
     print("Winrate: ", winrate_spear)
 
     # Compute Nash Rank
-    nash_ranking, _ = iterative_ranking(payoffs, agents, compute_nash)
+    nash_ranking, _ = iterative_ranking(payoffs, true_agents, compute_nash)
     nash_spear = spearman(total_nash_ranking, nash_ranking)
     print("Nash: ", nash_ranking)
     print("Winrate: ", nash_spear)
 
-
     # Compute Alpharank
-    alpha_ranking, _ = iterative_ranking(payoffs, agents, compute_alpha)
+    alpha_ranking, _ = iterative_ranking(payoffs, true_agents, compute_alpha)
     alpha_spear = spearman(total_alpha_ranking, alpha_ranking)
     print("Alpha: ", alpha_ranking)
     print("Winrate: ", alpha_spear)
@@ -150,13 +150,12 @@ def test_sample(data_ratio):
     return [winrate_spear, nash_spear, alpha_spear]
 
 
-N = 1
+N = 200
 winrate_spears = []
 nash_spears = []
 alpha_spears = []
 scales = [i/10.0 for i in range(1, 10)]
 scales = [0.0001] + [0.001] + [0.01] + scales + [0.99] + [0.999] + [0.9999]
-scales = [0.1]
 file1.write("Scales: " + str(scales) + "\n")
 file1.flush()
 scales_loop = tqdm(scales, leave=False)
