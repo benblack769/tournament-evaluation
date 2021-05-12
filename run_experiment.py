@@ -2,7 +2,25 @@ import pandas
 import numpy as np
 import random
 import sys
-from nash_solver import max_entropy_nash
+from nash_solver import max_entropy_nash, entropy_regularized_nash
+from open_spiel.python.egt import alpharank
+from open_spiel.python.egt import heuristic_payoff_table, utils
+
+def compute_alpha(payoff):
+    # TODO: To debug this, print out the matrix game from utils and see what it looks like
+    payoff = np.asarray(payoff)
+    payoff_matrix = np.asarray([payoff, np.copy(payoff)])
+    payoff_tables = [heuristic_payoff_table.from_matrix_game(payoff_matrix[0]),
+                     heuristic_payoff_table.from_matrix_game(payoff_matrix[1])]
+
+    # Check if the game is symmetric (i.e., players have identical strategy sets
+    # and payoff tables) and return only a single-player’s payoff table if so.
+    # This ensures Alpha-Rank automatically computes rankings based on the
+    # single-population dynamics.
+    _, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
+
+    (_, _, pi, _, _) = alpharank.compute(payoff_tables, alpha=30)
+    return pi
 
 def csv_data_to_matrix(event_data):
     event_data = event_data.reset_index()
@@ -50,6 +68,15 @@ def compute_win_rate(result, game_count):
 def compute_score_nash(result, game_count):
     assert np.equal(np.triu(result), result).all()
     return max_entropy_nash(result - result.T)
+
+def compute_score_regularized_nash(result, game_count):
+    assert np.equal(np.triu(result), result).all()
+    return entropy_regularized_nash(result - result.T)
+
+def compute_score_alpharank(result, game_count):
+    assert np.equal(np.triu(result), result).all()
+    return compute_alpha(result - result.T)
+
 
 # def variance_experiment(event_df, score_fn, selection_size):
 #     event_size = len(event_df)
@@ -176,7 +203,6 @@ def run_experiment(df, score_fn):
         #
         # print_ranking(scores,player_ids)
 
-
 def print_ranking(score, player_names):
     assert len(player_names) == len(score)
     ranking = list(reversed(sorted([(s,i,n) for i, (s, n) in enumerate(zip(score, player_names))])))
@@ -207,4 +233,5 @@ def print_all_rankings(df, score_fn):
 
 if __name__ == "__main__":
     fname = sys.argv[1]
+    df = pandas.read_csv(fname)
     print_all_rankings(df,compute_score_nash)
