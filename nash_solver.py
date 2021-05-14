@@ -43,7 +43,11 @@ def entropy_regularized_nash(A):
         cp.sum(x) == 1,
         x >= 0
     ]
-    cp.Problem(cp.Maximize(z + entropy_coef*cp.sum(cp.entr(x))), bounds).solve()#solver='GLPK')
+    try:
+        cp.Problem(cp.Maximize(z + entropy_coef*cp.sum(cp.entr(x))), bounds).solve()#solver='GLPK')
+    except cp.error.SolverError as se:
+        print(A)
+        raise se
     minimax_value = z.value
     nash_result = x.value
     return nash_result

@@ -9,7 +9,7 @@ from open_spiel.python.egt import heuristic_payoff_table, utils
 def compute_alpha(payoff):
     # TODO: To debug this, print out the matrix game from utils and see what it looks like
     payoff = np.asarray(payoff)
-    payoff_matrix = np.asarray([payoff, np.copy(payoff)])
+    payoff_matrix = np.asarray([np.copy(payoff), np.copy(payoff)])
     payoff_tables = [heuristic_payoff_table.from_matrix_game(payoff_matrix[0]),
                      heuristic_payoff_table.from_matrix_game(payoff_matrix[1])]
 
@@ -75,6 +75,7 @@ def compute_score_regularized_nash(result, game_count):
 
 def compute_score_alpharank(result, game_count):
     assert np.equal(np.triu(result), result).all()
+    result = result / np.abs(result).max()
     return compute_alpha(result - result.T)
 
 

@@ -7,11 +7,11 @@ np.set_printoptions(linewidth=200)
 np.set_printoptions(suppress=True)
 
 
-def generate_data(included_ratio=1.0):
+def generate_data(fname, included_ratio=1.0):
     name_set = set()
     matchup_payouts = defaultdict(list)
     matchup_counts = defaultdict(int)
-    with open("new_logs.csv") as log:
+    with open(fname) as log:
         reader = csv.DictReader(log)
         for row in reader:
             player1 = row["Player 1"]
@@ -31,7 +31,7 @@ def generate_data(included_ratio=1.0):
     return names, matchup_payouts
 
 
-def payoffs_from_matchups(agents, payoffs, sample_ratio=1.0):
+def payoffs_from_matchups(agents, payoffs, sample_ratio=1.0, clip=True):
     payoff_matrix = np.zeros((len(agents), len(agents)))
     for i, agent1 in enumerate(agents):
         for j, agent2 in enumerate(agents):
@@ -41,14 +41,17 @@ def payoffs_from_matchups(agents, payoffs, sample_ratio=1.0):
             if len(payoff_array) == 0:
                 payoff_matrix[i][j] = 0
                 continue
- 
+
             sample_count = int(sample_ratio * len(payoff_array))
             sample_array = np.random.choice(payoff_array, size=sample_count, replace=False)
-            summed = 5 * np.sum(sample_array) / sample_count
-            clipped = min(max(summed, -750), 750)
-            payoff_matrix[i][j] = clipped
+            payoff = np.sum(sample_array) / sample_count
+            if clip:
+                summed = 5 * payoff
+                payoff = min(max(summed, -750), 750)
+            payoff_matrix[i][j] = payoff
     return payoff_matrix
 
-
-#agents, true_matchup_payoffs = generate_data()
-#payoff_matrix = payoffs_from_matchups(agents, true_matchup_payoffs)
+if __name__ == "__main__":
+    agents, true_matchup_payoffs = generate_data("new_logs.csv")
+    payoff_matrix = payoffs_from_matchups(agents, true_matchup_payoffs)
+    print(payoff_matrix)

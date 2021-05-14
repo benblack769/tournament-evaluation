@@ -4,29 +4,41 @@ import pandas as pd
 import sys
 import numpy as np
 from utils import spearman
+import argparse
 import matplotlib
 import matplotlib.pyplot as plt
+from extract_data import generate_data, payoffs_from_matchups
 
 
-def compute_cross_rankings(df, score_fns):
+def compute_cross_rankings(payouts, score_fns):
+    event_matrix = payouts
+    game_count_matrix = np.ones_like(payouts)
     rank_similarities = np.zeros((len(score_fns), len(score_fns)))
-    events = set(df['event'])
-    for event in list(events):
-        event_data = df[df['event'] == event]
-        event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_data)
 
-        score_results = [fn(event_matrix, game_count_matrix) for fn in score_fns]
-        rankings = [np.argsort(res) for res in score_results]
-        for i,_ in enumerate(score_results):
-            for j,_ in enumerate(score_results):
-                rank_similarities[i,j] += spearman(rankings[i],rankings[j])
-
-
-    rank_similarities /= len(events)
+    score_results = [fn(event_matrix, game_count_matrix) for fn in score_fns]
+    rankings = [np.argsort(res) for res in score_results]
+    for i,_ in enumerate(score_results):
+        for j,_ in enumerate(score_results):
+            similarity = spearman(rankings[i],rankings[j])
+            rank_similarities[i,j] += similarity
 
     return rank_similarities
 
-def plot_similarities(df):
+def compute_capped_score(result, game_count):
+    print(result)
+    result = np.minimum(750, np.maximum(result*5, -750))
+    print(result)
+    return compute_score(result, game_count)
+
+def plot_similarities(csv_fnames, out_plotname, include_cap=False):
+    all_payouts = []
+
+    for fname in csv_fnames:
+        names, matchup_results = generate_data(fname)
+        payoff_matrix = payoffs_from_matchups(names, matchup_results, clip=False)
+        payoff_matrix = np.triu(payoff_matrix)
+        all_payouts.append(payoff_matrix)
+
     score_fn_names = [
         "compute_score_nash",
         "compute_score",
@@ -34,6 +46,8 @@ def plot_similarities(df):
         "compute_score_regularized_nash",
         'compute_score_alpharank',
     ]
+    if include_cap:
+        score_fn_names += ['compute_capped_score']
     score_fns = [
         compute_score_nash,
         compute_score,
@@ -41,8 +55,12 @@ def plot_similarities(df):
         compute_score_regularized_nash,
         compute_score_alpharank,
     ]
-    rank_similarities = compute_cross_rankings(df, score_fns)
+    if include_cap:
+        score_fns += [compute_capped_score]
+    print(all_payouts[0])
+    rank_similarities = np.mean([compute_cross_rankings(payouts, score_fns) for payouts in all_payouts],axis=0)
     rank_similarities = (100*rank_similarities).round()/100
+    print(all_payouts[0])
 
     fig, ax = plt.subplots()
     im = ax.imshow(rank_similarities)
@@ -65,10 +83,16 @@ def plot_similarities(df):
 
     ax.set_title("Spearman correlation on poker data")
     fig.tight_layout()
-    plt.savefig("spearman.png")
+    plt.savefig(out_plotname)
 
 
 if __name__ == "__main__":
-    fname = sys.argv[1]
-    df = pd.read_csv(fname)
-    plot_similarities(df)
+    parser = argparse.ArgumentParser(description='Compute rank similarities')
+    parser.add_argument('--outname', required=True, help='output filename')
+    parser.add_argument('--inputs', required=True, nargs='*', help='Tournament datas to construct inputs for')
+    parser.add_argument('--include-poker-cap', action="store_true", help='Includes row for poker cap')
+
+    args = parser.parse_args()
+
+    # df = pd.read_csv(fname)
+    plot_similarities(args.inputs, args.outname, args.include_poker_cap)
