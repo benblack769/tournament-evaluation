@@ -1,10 +1,12 @@
-import pandas
 import numpy as np
 import random
 import sys
+import argparse
 from nash_solver import max_entropy_nash, entropy_regularized_nash
 from open_spiel.python.egt import alpharank
 from open_spiel.python.egt import heuristic_payoff_table, utils
+from extract_data import generate_data, payoffs_from_matchups
+
 
 def compute_alpha(payoff):
     # TODO: To debug this, print out the matrix game from utils and see what it looks like
@@ -21,36 +23,6 @@ def compute_alpha(payoff):
 #
     (_, _, pi, _, _) = alpharank.compute(payoff_tables, alpha=30)
     return pi
-
-def csv_data_to_matrix(event_data):
-    event_data = event_data.reset_index()
-    assert all(event_data['event'] == event_data['event'][0])
-    del event_data['event']
-    grouped = event_data.groupby(['p1','p2'])['result'].aggregate(sum_result=sum,count=len)
-    player_ids = sorted(set(event_data['p1']) | set(event_data['p2']))
-    num_players = len(player_ids)
-    # print(grouped)
-    event_matrix = np.zeros((num_players,num_players))
-    game_count_matrix = np.zeros((num_players,num_players),dtype=np.int64)
-    for i in range(num_players):
-        for j in range(num_players):
-            try:
-                row = grouped.loc[player_ids[i],player_ids[j]]
-                sum_result = row['sum_result']
-                count = row['count']
-            except Exception as e:
-                sum_result = 0
-                count = 0
-
-            sign = -1
-            x,y = j,i
-            if j > i:
-                x,y = i,j
-                sign = 1
-            event_matrix[x][y] += sum_result * sign / count if count > 0 else 0
-            game_count_matrix[x][y] += count
-
-    return event_matrix, player_ids, game_count_matrix
 
 def compute_score(result, game_count):
     assert np.equal(np.triu(result), result).all()
@@ -137,10 +109,10 @@ def get_rank(scores):
     result[order] = np.arange(len(order))
     return result
 
-def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None, allow_matchthrows=True):
-    event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_df)
-    assert len(player_ids) > 2
-    n_players = len(player_ids)
+def exploitability_experiment(event_matrix, score_fn, n_colluding=2, min_score=None, allow_matchthrows=True):
+    game_count_matrix = np.ones_like(event_matrix)
+    assert len(event_matrix) > 2
+    n_players = len(event_matrix)
 
     if min_score is None:
         min_score = min(np.min(event_matrix), -np.max(event_matrix))
@@ -148,7 +120,7 @@ def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None,
     num_tests = 100
     total_rank_increase = 0
     for i in range(num_tests):
-        colluding_agents = [int(x) for x in np.random.choice(len(player_ids), size=n_colluding, replace=False)]
+        colluding_agents = [int(x) for x in np.random.choice(len(event_matrix), size=n_colluding, replace=False)]
 
         event_matrix_copy = event_matrix.copy()
 
@@ -188,16 +160,13 @@ def exploitability_experiment(event_df, score_fn, n_colluding=2, min_score=None,
     print(total_rank_increase/num_tests)
 
 
-def run_experiment(df, score_fn):
-    events = set(df['event'])
-    for event in list(events)[1:]:
-        print(event)
-        event_data = df[df['event'] == event]
+def run_experiment(payoffs):
+    for event_payoff in payoffs:
         # event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_data)
         print("match throws allowed")
-        exploitability_experiment(event_data, compute_score, n_colluding=2, min_score=None, allow_matchthrows=True)
+        exploitability_experiment(event_payoff, compute_score, n_colluding=2, min_score=None, allow_matchthrows=True)
         print("match throws disallowed")
-        exploitability_experiment(event_data, compute_score, n_colluding=2, min_score=None, allow_matchthrows=False)
+        exploitability_experiment(event_payoff, compute_score, n_colluding=2, min_score=None, allow_matchthrows=False)
         # print(event_matrix)
         # print(game_count_matrix)
         # scores = score_fn(event_matrix, game_count_matrix)
@@ -232,7 +201,23 @@ def print_all_rankings(df, score_fn):
         # print(ordered_mat)
         # print(event_matrix - event_matrix.T)
 
+def load_payoffs(csv_fnames):
+    all_payouts = []
+
+    for fname in csv_fnames:
+        names, matchup_results = generate_data(fname)
+        payoff_matrix = payoffs_from_matchups(names, matchup_results, clip=False)
+        payoff_matrix = np.triu(payoff_matrix)
+        all_payouts.append(payoff_matrix)
+
+    return all_payouts
+
 if __name__ == "__main__":
-    fname = sys.argv[1]
-    df = pandas.read_csv(fname)
-    print_all_rankings(df,compute_score_nash)
+    parser = argparse.ArgumentParser(description='Compute rank similarities')
+    parser.add_argument('--inputs', required=True, nargs='*', help='Tournament datas to construct inputs for')
+
+    args = parser.parse_args()
+
+    # df = pd.read_csv(fname)
+    payoffs = load_payoffs(args.inputs)
+    run_experiment(payoffs)
