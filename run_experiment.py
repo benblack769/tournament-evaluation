@@ -18,7 +18,7 @@ def compute_alpha(payoff):
     # This ensures Alpha-Rank automatically computes rankings based on the
     # single-population dynamics.
     _, payoff_tables = utils.is_symmetric_matrix_game(payoff_tables)
-
+#
     (_, _, pi, _, _) = alpharank.compute(payoff_tables, alpha=30)
     return pi
 
