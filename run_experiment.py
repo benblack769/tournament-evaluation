@@ -53,6 +53,11 @@ def compute_score_alpharank(result, game_count):
     result = result / np.abs(result).max()
     return compute_alpha(result - result.T)
 
+def compute_capped_score(result, game_count):
+    # print(result)
+    result = np.minimum(750, np.maximum(result*5, -750))
+    # print(result)
+    return compute_score(result, game_count)
 
 # def variance_experiment(event_df, score_fn, selection_size):
 #     event_size = len(event_df)
@@ -123,13 +128,13 @@ def competition_fn(score1, score2, value1, value2, temp):
     return value1 if rejected else value2
 
 def genetic_algorithm(score_fn, mutate_fn, initial_value_fn, crossover_fn, initial_value):
-    pop = 10
-    n_crossovers = 5
-    n_mutates = 5
-    n_reinits = 3
-    n_initials = 2
+    pop = 30
+    n_crossovers = 15
+    n_mutates = 15
+    n_reinits = 10
+    n_initials = 10
 
-    n_iters = 100
+    n_iters = 150
     population = [initial_value_fn() for i in range(pop)]
     best_score = score_fn(initial_value)
     best_result = initial_value
@@ -243,32 +248,38 @@ def exploitability_experiment(event_matrix, score_fn, n_colluding=2, min_score=N
     total_rank_increase = 0
     total_annealing_rank_increase = 0
     args = (event_matrix, score_fn, n_colluding, min_score, allow_matchthrows)
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    pool = multiprocessing.Pool(multiprocessing.cpu_count()//2)
     results = pool.map(run_exploit_arg, [args]*num_tests)
     for i in range(num_tests):
         genetic_rank_increase, anneal_rank_increase = results[i]
-        total_rank_increase += genetic_rank_increase
-        total_annealing_rank_increase += anneal_rank_increase
+        best_increase = max(genetic_rank_increase,anneal_rank_increase)
+        total_rank_increase += best_increase
+        # total_annealing_rank_increase += anneal_rank_increase
     # for i in range(num_tests):
     #     genetic_rank_increase, anneal_rank_increase = single_exploit_experiment(*args)
     #     total_rank_increase += genetic_rank_increase
     #     total_annealing_rank_increase += anneal_rank_increase
 
-    print(total_rank_increase/num_tests, total_annealing_rank_increase/num_tests)
+    return total_rank_increase/num_tests
+    # print(total_rank_increase/num_tests, total_annealing_rank_increase/num_tests)
 
 
-def run_experiment(payoffs):
+def run_experiment(payoffs, score_fn):
+    total_payoff = 0
     for event_payoff in payoffs:
         # event_matrix, player_ids, game_count_matrix = csv_data_to_matrix(event_data)
-        print("match throws allowed")
-        exploitability_experiment(event_payoff, compute_score, n_colluding=2, min_score=None, allow_matchthrows=True)
-        print("match throws disallowed")
-        exploitability_experiment(event_payoff, compute_score, n_colluding=2, min_score=None, allow_matchthrows=False)
+        # print("match throws allowed")
+        allow_throws_val = exploitability_experiment(event_payoff, score_fn, n_colluding=2, min_score=None, allow_matchthrows=True)
+        # print("match throws disallowed")
+        disallow_throws_val = exploitability_experiment(event_payoff, score_fn, n_colluding=2, min_score=None, allow_matchthrows=False)
+        best_val = max(allow_throws_val, disallow_throws_val)
+        total_payoff += best_val
         # print(event_matrix)
         # print(game_count_matrix)
         # scores = score_fn(event_matrix, game_count_matrix)
-        #
         # print_ranking(scores,player_ids)
+
+    print(total_payoff/len(payoffs))
 
 def print_ranking(score, player_names):
     assert len(player_names) == len(score)
@@ -317,4 +328,15 @@ if __name__ == "__main__":
 
     # df = pd.read_csv(fname)
     payoffs = load_payoffs(args.inputs)
-    run_experiment(payoffs)
+    print("compute_score")
+    run_experiment(payoffs,compute_score)
+    print("compute_win_rate")
+    run_experiment(payoffs,compute_win_rate)
+    print("compute_capped_score")
+    run_experiment(payoffs,compute_capped_score)
+    print("compute_score_nash")
+    run_experiment(payoffs,compute_score_nash)
+    print("compute_score_alpharank")
+    run_experiment(payoffs,compute_score_alpharank)
+    print("compute_score_regularized_nash")
+    run_experiment(payoffs,compute_score_regularized_nash)
