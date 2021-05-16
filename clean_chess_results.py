@@ -1,5 +1,6 @@
 import pandas
 import numpy as np
+import sys
 
 
 def replace_(s):
@@ -55,7 +56,9 @@ def fold_csv_file(in_fname, out_fname):
         file.write("".join([header]+list(sorted(final_lines))))
 
 def main():
-    df = pandas.read_csv("chess_data/all_data.csv")
+    assert len(sys.argv) == 2, "needs one argument, filename of raw chess data"
+    fname = sys.argv[1]
+    df = pandas.read_csv(fname)
     new_df = pandas.DataFrame({
         'event': df['Event'].transform(replace_),
         'p1': df['White'].transform(replace_),
@@ -87,6 +90,14 @@ def main():
     new_df = new_df[(new_df['players']*(new_df['players']-1))/2 < new_df['pairing']]
     del new_df['pairing']
     del new_df['players']
+    new_df['Event'] = new_df['event']
+    new_df['Player 1'] = new_df['p1']
+    new_df['Player 2'] = new_df['p2']
+    new_df['Earnings'] = new_df['result']
+    del new_df['event']
+    del new_df['p1']
+    del new_df['p2']
+    del new_df['result']
 
     # group identical pairings within each tournament
     # new_df['pairing'] = new_df['p1']+":"+new_df['p2']
@@ -101,19 +112,19 @@ def main():
 
     # new_df['temp'] = new_df['p1']
     # new_df['pairing'].where(reord_pairing < new_df['pairing'], reord_pairing, inplace=True)
-    agg = new_df.groupby(['event','p1','p2'])
-    agg_res = agg['result'].aggregate(num_games=len, result= np.sum)
-    # agg_count = agg['result'].aggregate(len)
-    # agg_count['count'] = agg_count['result']
-    # del agg_count['result']
-    # all = pandas.merge(agg_count, agg_res, how='left')
-    # agg_res[mes'] = agg['result'].aggregate(len)
-    agg_res = agg_res.reset_index()
-
-    # print(new_df[])
-    # print(sorted(set(new_df['event'])))
-    # print(new_df[new_df['event'] == 'TCEC_Season_17_-_LCZeroCPU_vs_DivP_CPU'])
-    agg_res.to_csv("minimatch_data.csv", index=False)
+    # agg = new_df.groupby(['event','p1','p2'])
+    # agg_res = agg['result'].aggregate(num_games=len, result= np.sum)
+    # # agg_count = agg['result'].aggregate(len)
+    # # agg_count['count'] = agg_count['result']
+    # # del agg_count['result']
+    # # all = pandas.merge(agg_count, agg_res, how='left')
+    # # agg_res[mes'] = agg['result'].aggregate(len)
+    # agg_res = agg_res.reset_index()
+    #
+    # # print(new_df[])
+    # # print(sorted(set(new_df['event'])))
+    # # print(new_df[new_df['event'] == 'TCEC_Season_17_-_LCZeroCPU_vs_DivP_CPU'])
+    # agg_res.to_csv("minimatch_data.csv", index=False)
 
 if __name__ == "__main__":
     main()
